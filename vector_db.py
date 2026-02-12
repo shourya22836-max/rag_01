@@ -17,12 +17,12 @@ class QdrantStorage:
         self.client.upsert(self.collection, points=points)
 
     def search(self, query_vector, top_k: int = 5):
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=self.collection,
-            query_vector=query_vector,
+            query=query_vector,
             with_payload=True,
             limit=top_k
-        )
+        ).points
         contexts = []
         sources = set()
 
@@ -35,3 +35,31 @@ class QdrantStorage:
                 sources.add(source)
 
         return {"contexts": contexts, "sources": list(sources)}
+
+    def reset_collection(self):
+        """Delete and recreate the collection to clear all data."""
+        try:
+            # Delete the existing collection
+            if self.client.collection_exists(self.collection):
+                self.client.delete_collection(self.collection)
+
+            # Recreate the collection
+            self.client.create_collection(
+                collection_name=self.collection,
+                vectors_config=VectorParams(size=3072, distance=Distance.COSINE),
+            )
+            return True
+        except Exception as e:
+            print(f"Error resetting collection: {e}")
+            return False
+
+    def get_collection_count(self):
+        """Get the number of vectors in the collection."""
+        try:
+            if not self.client.collection_exists(self.collection):
+                return 0
+            count = self.client.count(collection_name=self.collection)
+            return count.count
+        except Exception as e:
+            print(f"Error getting collection count: {e}")
+            return 0
